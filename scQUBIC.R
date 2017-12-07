@@ -1,0 +1,67 @@
+## scRNA-seq DATA #
+setwd("Z:/work/QUBIC2.0/single cell RNA-seq/SC3_data_ready/SC3_DATA.tar/SC3_DATA/ref_6.Biase")
+library(QUBIC)
+Biase <-read.table("Yan_expression_RPKM.txt",sep="\t",header=T)
+
+matrix.please<-function(x) {
+  m<-as.matrix(x[,-1])
+  rownames(m)<-x[,1]
+  m
+}
+
+M <-matrix.please(Biase)
+a <-t(Biase)  # transpose the dataset
+
+ref <- read.csv("Yan_expression_RPKM.csv", header = T)
+ref_7_1 <- ref[,-1]
+rownames(ref_7_1) <- ref[,1]
+
+m <- data.matrix(ref_7_1)
+mm <- discretize(m,r=1,q=0)
+t<- t(m)
+
+system.time(res <- biclust::biclust(t,method=BCQU(),r=1,q=0,c=1,f=0, verbose=TRUE))
+
+m <- data.matrix(ref_7_1)
+mm <- qudiscretize(m,r=1,q=0)
+t<- t(mm)
+system.time(res <- biclust::biclust(t,method=BCQUD(),c=0.95,f=0, verbose=TRUE))
+
+
+
+
+conds <-as.character()  # a vector to store the condtions in biclusters
+label_C <-as.numeric()   # a vector to store the classification for conditions
+label_G <-as.numeric()  # a vector to store the classification for genes
+genes <-as.character()  # a vector to store the genes in biclusters
+for (i in 1:res@Number){
+  bic <-bicluster(t,res)[[i]]   # extract ith bicluster
+  CondNum <-dim(bic)[2]    # the condition number of the bicluster
+  GeneNum <-dim(bic)[1]    # the gene number of the bicluster
+  conds <-c(conds,colnames(bic)) 
+  genes <-c(genes,rownames(bic))
+  label_C <-c(label_C,rep(i,CondNum))  
+  label_G <-c(label_G,rep(i,GeneNum))
+}
+left_gene <-setdiff(rownames(t),genes)  # genes not included in biclusters
+left_cond <-setdiff(colnames(t),conds)  # conditions not included in biclusters
+left_label_G <-rep(res@Number+1,length(left_gene))
+left_label_C <-rep(res@Number+1,length(left_cond))
+labels_C <-c(label_C,left_label_C)
+labels_G <-c(label_G,left_label_G)
+Genes_all <-c(genes,left_gene)   # combine the genes
+Conds_all <-c(conds,left_cond)   # combine the conditions
+df_G <-data.frame(gene=Genes_all,label=labels_G)    # dataframe to store genes and label
+df_C <-data.frame(conds=Conds_all,label=labels_C)   # dataframe to store conds and label
+
+
+
+target <-read.table("cell_types.txt",header=T,sep="\t")    # the ground true of the classification
+
+sorted_label <-df_C[match(target$SampleID,df_C$conds),]$label   # sort the label based on the order of target sample ID
+
+library(mclust)    # load mclust package
+adjustedRandIndex(sorted_label,target$Cluster)  # calculate ARI
+showinfo(ref,c(res))
+summary(res)
+
