@@ -57,7 +57,7 @@ library(mclust)    # load mclust package
 adjustedRandIndex(sorted_label,target$Cluster)  # calculate ARI
 
  
-
+#
 
 
 
